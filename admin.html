@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADMIN | CPX AKIRA V1.1</title>
+
+  <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* FOTO DE FUNDO ATUALIZADA */
+      background: url('https://files.catbox.moe/kix2v8.jpg') no-repeat center center fixed;
+      background-size: cover;
+      font-family: 'Inter', sans-serif;
+      position: relative;
+    }
+    /* Camada de escurecimento para dar leitura ao painel */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 0;
+    }
+    .glass-box {
+      position: relative;
+      z-index: 10;
+      background: rgba(43, 37, 60, 0.92);
+      border-radius: 26px;
+      width: 95%;
+      max-width: 520px;
+      padding: 26px;
+      border: 1px solid rgba(148,163,184,0.3);
+      box-shadow: 0 25px 70px rgba(0,0,0,0.9);
+      backdrop-filter: blur(15px);
+    }
+    .font-cyber { font-family: 'Orbitron', sans-serif; }
+    .tab-btn { color: #c4c4d4; border-bottom: 2px solid transparent; }
+    .tab-btn.active { color: #c4b5fd; border-color: #a855f7; }
+    .btn-time {
+      background: #05020b;
+      border-radius: 16px;
+      color: #e5e7eb;
+      border: 1px solid rgba(15,23,42,0.9);
+      transition: 0.2s;
+      font-weight: 600;
+    }
+    .btn-time.active { border-color: #a855f7; box-shadow: 0 0 15px rgba(168,85,247,0.5); }
+    .btn-gerar {
+      background: linear-gradient(135deg, #a855f7, #4c1d95);
+      color: #f9fafb;
+      font-weight: 800;
+      border-radius: 22px;
+      box-shadow: 0 10px 30px rgba(168,85,247,0.4);
+    }
+    .tr-key { border-bottom: 1px solid rgba(148,163,184,0.1); background: rgba(5,2,11,0.5); }
+  </style>
+</head>
+<body>
+  <div class="glass-box">
+    <h1 class="font-cyber text-center text-white text-xl mb-6 uppercase tracking-[0.4em]">
+      ADMIN <span class="text-purple-400">AKIRA V1.1</span>
+    </h1>
+
+    <div class="flex mb-8 border-b border-white/10">
+      <button onclick="switchTab('gerar')" id="b-gerar" class="flex-1 text-[10px] font-bold uppercase tab-btn active pb-3">Gerar</button>
+      <button onclick="switchTab('lista')" id="b-lista" class="flex-1 text-[10px] font-bold uppercase tab-btn pb-3">Gerenciar</button>
+    </div>
+
+    <div id="tab-gerar">
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <button onclick="setVal(0.0208, '30M', this)" class="btn-time p-4 text-[10px]">30M</button>
+        <button onclick="setVal(0.0833, '2H', this)" class="btn-time p-4 text-[10px]">2H</button>
+        <button onclick="setVal(1, '1D', this)" class="btn-time p-4 text-[10px]">1D</button>
+        <button onclick="setVal(7, '7D', this)" class="btn-time p-4 text-[10px]">7D</button>
+        <button onclick="setVal(15, '15D', this)" class="btn-time p-4 text-[10px]">15D</button>
+        <button onclick="setVal(30, '30D', this)" class="btn-time p-4 text-[10px]">30D</button>
+      </div>
+      <button onclick="setVal(0, 'VITALICIA', this)" class="btn-time w-full p-4 text-[10px] mb-6">VITALÍCIA</button>
+      <button onclick="gerarKey()" class="w-full btn-gerar py-5 text-sm uppercase">Gerar Chave Agora</button>
+      <div id="key-res" class="hidden mt-6 p-4 bg-black/60 rounded-xl text-center font-cyber text-white border border-purple-500/40 text-xs tracking-widest"></div>
+    </div>
+
+    <div id="tab-lista" class="hidden max-h-[320px] overflow-y-auto mt-2">
+      <table class="w-full text-white text-[11px]"><tbody id="lista-chaves"></tbody></table>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyADWH-HdJUFByEuHBdHZkf7mDSD1-dBnRA",
+      authDomain: "cpx-akira.firebaseapp.com",
+      databaseURL: "https://cpx-akira-default-rtdb.firebaseio.com",
+      projectId: "cpx-akira",
+      storageBucket: "cpx-akira.firebasestorage.app",
+      messagingSenderId: "126066483108",
+      appId: "1:126066483108:web:ecbc2bb38a8e3e8575eb31"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let tDias = null; let pref = "";
+
+    function switchTab(t) {
+      document.getElementById('tab-gerar').classList.toggle('hidden', t === 'lista');
+      document.getElementById('tab-lista').classList.toggle('hidden', t === 'gerar');
+      document.getElementById('b-gerar').classList.toggle('active', t === 'gerar');
+      document.getElementById('b-lista').classList.toggle('active', t === 'lista');
+    }
+
+    function setVal(d, p, b) {
+      tDias = d; pref = p;
+      document.querySelectorAll('.btn-time').forEach(btn => btn.classList.remove('active'));
+      b.classList.add('active');
+    }
+
+    function gerarKey() {
+      if (!pref) return alert("Selecione um tempo!");
+      const key = `AKIRA-${pref}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      const validade = (pref === 'VITALICIA') ? null : Date.now() + (tDias * 24 * 60 * 60 * 1000);
+      db.ref('chaves/' + key).set({ validade }).then(() => {
+        const box = document.getElementById('key-res');
+        box.classList.remove('hidden'); box.textContent = key;
+        navigator.clipboard.writeText(key);
+      });
+    }
+
+    db.ref('chaves').on('value', (snap) => {
+      const list = document.getElementById('lista-chaves');
+      list.innerHTML = "";
+      const data = snap.val() || {};
+      Object.keys(data).forEach((key) => {
+        const v = data[key].validade;
+        const status = !v ? 'VITALÍCIA' : (Date.now() > v ? 'EXPIRADA' : 'ATIVA');
+        list.innerHTML += `<tr class="tr-key"><td class="py-3 px-2 font-mono text-[9px] uppercase">${key} <span class="${status === 'ATIVA' ? 'text-green-400' : 'text-red-400'} ml-2">${status}</span></td><td class="text-right px-2"><button onclick="apagarKey('${key}')" class="text-red-400 font-bold text-[9px] uppercase">Apagar</button></td></tr>`;
+      });
+    });
+
+    function apagarKey(key) { if (confirm("Apagar key?")) db.ref('chaves/' + key).remove(); }
+  </script>
+</body>
+</html>
